@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Retraq — Personal Projects</title>
+    <title>Retraq — Your Second Brain</title>
     <meta name="description" content="Retraq — PWA personal untuk tracking proyek pribadi, offline-first.">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#7c3aed">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Retraq">
@@ -24,24 +24,51 @@
             <div class="sidebar-brand">
                 <span class="brand-icon">◈</span>
                 <div>
-                    <strong>Retraq</strong>
-                    <span class="brand-tag" style="line-height: 1.3; margin-top: 0.15rem; font-size: 0.7rem;">Capture, Connect, Execute. Your Actionable Second Brain</span>
+                    <strong style="font-size:0.9rem">Retraq</strong>
+                    <span class="brand-tag">Your Second Brain</span>
                 </div>
             </div>
             <nav class="sidebar-nav">
-                <a href="#/" class="nav-link" data-route="/">Dashboard</a>
-                <a href="#/projects" class="nav-link" data-route="/projects">Projects</a>
-                <a href="#/inbox" class="nav-link" data-route="/inbox">Inbox <span class="nav-badge" id="inbox-badge" hidden></span></a>
-                <a href="#/daily" class="nav-link" data-route="/daily">Daily Notes</a>
-                <a href="#/library" class="nav-link" data-route="/library">Library</a>
-                <a href="#/areas" class="nav-link" data-route="/areas">Areas</a>
-                <a href="#/habits" class="nav-link" data-route="/habits">Habits</a>
-                <a href="#/search" class="nav-link" data-route="/search">Search</a>
-                <a href="#/review" class="nav-link" data-route="/review">Review</a>
-                <a href="#/settings" class="nav-link" data-route="/settings">Settings</a>
+                <a href="#/" class="nav-link" data-route="/">
+                    <span class="nav-icon">⊞</span> Dashboard
+                </a>
+
+                <div class="sidebar-section-label">Workspace</div>
+                <a href="#/projects" class="nav-link" data-route="/projects">
+                    <span class="nav-icon">◧</span> Projects
+                </a>
+                <a href="#/inbox" class="nav-link" data-route="/inbox">
+                    <span class="nav-icon">◫</span> Inbox <span class="nav-badge" id="inbox-badge" hidden></span>
+                </a>
+                <a href="#/habits" class="nav-link" data-route="/habits">
+                    <span class="nav-icon">◉</span> Habits
+                </a>
+
+                <div class="sidebar-section-label">Knowledge</div>
+                <a href="#/daily" class="nav-link" data-route="/daily">
+                    <span class="nav-icon">◇</span> Daily Notes
+                </a>
+                <a href="#/library" class="nav-link" data-route="/library">
+                    <span class="nav-icon">▤</span> Library
+                </a>
+                <a href="#/areas" class="nav-link" data-route="/areas">
+                    <span class="nav-icon">◈</span> Areas
+                </a>
+
+                <div class="sidebar-section-label">Tools</div>
+                <a href="#/search" class="nav-link" data-route="/search">
+                    <span class="nav-icon">⌕</span> Search
+                </a>
+                <a href="#/review" class="nav-link" data-route="/review">
+                    <span class="nav-icon">↻</span> Review
+                </a>
+                <a href="#/settings" class="nav-link" data-route="/settings">
+                    <span class="nav-icon">⚙</span> Settings
+                </a>
             </nav>
             <div class="sidebar-footer">
-                <span class="muted">Offline · Local-first</span>
+                <span class="status-dot"></span>
+                <span class="muted">Local · Offline-first</span>
             </div>
         </aside>
 
@@ -49,6 +76,11 @@
             <header class="topbar">
                 <button type="button" class="btn-icon menu-toggle" id="menu-toggle" aria-label="Toggle menu">☰</button>
                 <h1 class="page-title" id="page-title">Dashboard</h1>
+                <button type="button" class="cmd-trigger" id="cmd-trigger" aria-label="Search">
+                    <span class="cmd-trigger-icon">⌕</span>
+                    <span class="cmd-trigger-text">Search…</span>
+                    <kbd class="cmd-trigger-kbd">⌘K</kbd>
+                </button>
                 <button type="button" class="btn btn-primary btn-sm" id="header-action" hidden>+ New Project</button>
             </header>
 
@@ -110,6 +142,7 @@
     <script src="js/projects.js"></script>
     <script src="js/project-detail.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/command-palette.js"></script>
     <script src="js/app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

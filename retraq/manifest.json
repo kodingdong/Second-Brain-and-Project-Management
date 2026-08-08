@@ -1,11 +1,11 @@
 {
   "name": "Retraq Personal",
   "short_name": "Retraq",
-  "description": "Personal project tracker — offline-first PWA",
+  "description": "Your Second Brain — capture, connect, execute. Offline-first PWA.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f0f14",
-  "theme_color": "#6366f1",
+  "background_color": "#0c0c11",
+  "theme_color": "#7c3aed",
   "orientation": "portrait-primary",
   "icons": [
     {

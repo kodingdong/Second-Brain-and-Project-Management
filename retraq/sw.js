@@ -1,4 +1,4 @@
-const CACHE_NAME = 'retraq-v5';
+const CACHE_NAME = 'retraq-v6';
 const ASSETS = [
     './',
     './index.html',
@@ -22,6 +22,7 @@ const ASSETS = [
     './js/projects.js',
     './js/project-detail.js',
     './js/dashboard.js',
+    './js/command-palette.js',
     './js/app.js'
 ];
 

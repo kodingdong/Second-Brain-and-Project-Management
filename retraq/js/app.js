@@ -37,8 +37,9 @@ const Settings = {
             '<div class="section">' +
                 '<h2 class="section-title" style="margin-bottom:0.75rem">About</h2>' +
                 '<div class="card">' +
-                    '<p><strong>Retraq Personal</strong> — v0.5 Habits + Active Brain</p>' +
+                    '<p><strong>Retraq</strong> — v1.0 Obsidian × Notion Redesign</p>' +
                     '<p class="muted" style="margin-top:0.5rem">Vanilla JS · IndexedDB · Offline-first PWA</p>' +
+                    '<p class="muted" style="margin-top:0.25rem"><kbd>Ctrl+K</kbd> Command Palette · <kbd>N</kbd> New Project · <kbd>C</kbd> Quick Capture</p>' +
                 '</div>' +
             '</div>';
 
@@ -114,6 +115,7 @@ const App = {
             return App.loadSeedIfEmpty();
         }).then(function() {
             Capture.init();
+            CommandPalette.initShortcuts();
             App.bindEvents();
             App.updateInboxBadge();
             App.navigate(window.location.hash || '#/');
@@ -236,6 +238,14 @@ const App = {
                 Capture.showQuickCapture();
             }
         });
+
+        // Search trigger button
+        var cmdTrigger = document.getElementById('cmd-trigger');
+        if (cmdTrigger) {
+            cmdTrigger.addEventListener('click', function() {
+                CommandPalette.open();
+            });
+        }
     },
 
     toggleSidebar: function() {
