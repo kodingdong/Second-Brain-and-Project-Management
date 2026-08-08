@@ -131,7 +131,7 @@ const Projects = {
                                 var p = item.project;
                                 var prog = item.progress;
                                 return (
-                                    '<div class="kanban-card card-clickable" data-action="open-project" data-id="' + p.id + '">' +
+                                    '<div class="kanban-card card-clickable" draggable="true" data-action="open-project" data-id="' + p.id + '">' +
                                         '<div class="kanban-card-title">' +
                                             '<span>' + Utils.escapeHtml(p.icon) + '</span> ' +
                                             Utils.escapeHtml(p.title) +
@@ -233,6 +233,52 @@ const Projects = {
         container.querySelectorAll('[data-action="open-project"]').forEach(function(el) {
             el.addEventListener('click', function() {
                 window.location.hash = '#/project/' + el.dataset.id;
+            });
+        });
+
+        // Kanban Drag & Drop
+        var draggedCard = null;
+
+        container.querySelectorAll('.kanban-card').forEach(function(card) {
+            card.addEventListener('dragstart', function(e) {
+                draggedCard = card;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', card.dataset.id);
+                setTimeout(function() { card.style.opacity = '0.5'; }, 0);
+            });
+            card.addEventListener('dragend', function() {
+                draggedCard = null;
+                card.style.opacity = '1';
+                container.querySelectorAll('.kanban-column').forEach(function(col) {
+                    col.classList.remove('drag-over');
+                });
+            });
+        });
+
+        container.querySelectorAll('.kanban-column').forEach(function(col) {
+            col.addEventListener('dragover', function(e) {
+                e.preventDefault(); // Necessary to allow drop
+                e.dataTransfer.dropEffect = 'move';
+                if (draggedCard && !col.contains(draggedCard)) {
+                    col.classList.add('drag-over');
+                }
+            });
+            col.addEventListener('dragleave', function(e) {
+                if (!col.contains(e.relatedTarget)) {
+                    col.classList.remove('drag-over');
+                }
+            });
+            col.addEventListener('drop', function(e) {
+                e.preventDefault();
+                col.classList.remove('drag-over');
+                var projectId = e.dataTransfer.getData('text/plain');
+                var newStatus = col.dataset.status;
+
+                if (projectId && newStatus) {
+                    RetraqDB.updateProject(projectId, { status: newStatus }).then(function() {
+                        Projects.render();
+                    });
+                }
             });
         });
     },

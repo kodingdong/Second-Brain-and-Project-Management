@@ -5,6 +5,18 @@ const Settings = {
 
         container.innerHTML =
             '<div class="section">' +
+                '<h2 class="section-title" style="margin-bottom:0.75rem">Appearance</h2>' +
+                '<div class="card">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                        '<span>Theme Mode</span>' +
+                        '<select id="theme-select" class="form-group" style="margin:0;width:auto">' +
+                            '<option value="dark">Dark (Default)</option>' +
+                            '<option value="light">Light</option>' +
+                        '</select>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="section">' +
                 '<h2 class="section-title" style="margin-bottom:0.75rem">Data Backup</h2>' +
                 '<div class="card">' +
                     '<p class="muted" style="margin-bottom:1rem">Semua data disimpan lokal di IndexedDB browser ini. Export secara berkala untuk backup.</p>' +
@@ -42,6 +54,20 @@ const Settings = {
                     '<p class="muted" style="margin-top:0.25rem"><kbd>Ctrl+K</kbd> Command Palette · <kbd>N</kbd> New Project · <kbd>C</kbd> Quick Capture</p>' +
                 '</div>' +
             '</div>';
+
+        var themeSelect = container.querySelector('#theme-select');
+        if (themeSelect) {
+            themeSelect.value = localStorage.getItem('retraq_theme') || 'dark';
+            themeSelect.addEventListener('change', function(e) {
+                var theme = e.target.value;
+                localStorage.setItem('retraq_theme', theme);
+                if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+            });
+        }
 
         container.querySelector('#btn-export').addEventListener('click', function() {
             RetraqDB.exportJSON().then(function(payload) {
@@ -111,6 +137,11 @@ const App = {
     currentRoute: null,
 
     init: function() {
+        var savedTheme = localStorage.getItem('retraq_theme');
+        if (savedTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+
         RetraqDB.init().then(function() {
             return App.loadSeedIfEmpty();
         }).then(function() {
