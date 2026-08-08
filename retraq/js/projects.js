@@ -1,73 +1,243 @@
+/**
+ * Projects — Notion-style multi-view (Gallery / Kanban / Table)
+ */
 const Projects = {
+    currentView: 'gallery',
+    VIEWS: ['gallery', 'kanban', 'table'],
+
     render: function() {
         var container = document.getElementById('view-projects');
         if (!container) return;
 
-        RetraqDB.getAllProjects().then(function(projects) {
-            if (!projects.length) {
-                container.innerHTML =
-                    '<div class="empty-state card">' +
-                        '<p>Belum ada proyek. Buat proyek pertama untuk mulai tracking.</p>' +
-                        '<button type="button" class="btn btn-primary" data-action="new-project">+ New Project</button>' +
-                    '</div>';
-                Projects.bindActions(container);
-                return;
-            }
+        // Restore saved view preference
+        var saved = localStorage.getItem('retraq_projects_view');
+        if (saved && Projects.VIEWS.indexOf(saved) !== -1) {
+            Projects.currentView = saved;
+        }
 
-            Promise.all(projects.map(function(project) {
+        Promise.all([
+            RetraqDB.getAllProjects(),
+        ]).then(function(results) {
+            var projects = results[0];
+
+            return Promise.all(projects.map(function(project) {
                 return RetraqDB.getProjectProgress(project.id).then(function(progress) {
                     return { project: project, progress: progress };
                 });
-            })).then(function(items) {
-                container.innerHTML =
-                    '<div class="section-header">' +
-                        '<div><h2 class="section-title">All Projects</h2><p class="muted">' + items.length + ' proyek</p></div>' +
-                        '<button type="button" class="btn btn-primary btn-sm" data-action="new-project">+ New Project</button>' +
+            }));
+        }).then(function(items) {
+            container.innerHTML =
+                '<div class="projects-header">' +
+                    '<div>' +
+                        '<h2 class="section-title">Projects</h2>' +
+                        '<p class="muted">' + items.length + ' project' + (items.length !== 1 ? 's' : '') + '</p>' +
                     '</div>' +
-                    items.map(function(item) {
-                        return Projects.renderCard(item.project, item.progress);
-                    }).join('');
+                    '<div class="projects-toolbar">' +
+                        Projects.renderViewSwitcher() +
+                        '<button type="button" class="btn btn-primary btn-sm" data-action="new-project">+ New</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div id="projects-view-container">' +
+                    Projects.renderCurrentView(items) +
+                '</div>';
 
-                Projects.bindActions(container);
-            });
+            Projects.bindActions(container);
         });
     },
 
-    renderCard: function(project, progress) {
-        progress = progress || { done: 0, total: 0, percent: 0 };
-        return (
-            '<article class="card card-clickable" data-action="open-project" data-id="' + project.id + '">' +
-                '<div class="card-header">' +
-                    '<div style="display:flex;gap:0.75rem;align-items:flex-start">' +
-                        '<span class="project-icon">' + Utils.escapeHtml(project.icon) + '</span>' +
-                        '<div>' +
-                            '<div class="project-title">' + Utils.escapeHtml(project.title) + '</div>' +
-                            (project.description ? '<p class="muted" style="margin-top:0.25rem">' + Utils.escapeHtml(project.description) + '</p>' : '') +
+    renderViewSwitcher: function() {
+        var icons = { gallery: '▦', kanban: '⊞', table: '≡' };
+        return '<div class="view-switcher">' +
+            Projects.VIEWS.map(function(view) {
+                return '<button type="button" class="view-switch-btn' +
+                    (Projects.currentView === view ? ' active' : '') +
+                    '" data-view="' + view + '" title="' + view.charAt(0).toUpperCase() + view.slice(1) + ' view">' +
+                    icons[view] + '</button>';
+            }).join('') +
+        '</div>';
+    },
+
+    renderCurrentView: function(items) {
+        switch (Projects.currentView) {
+            case 'kanban': return Projects.renderKanban(items);
+            case 'table': return Projects.renderTable(items);
+            default: return Projects.renderGallery(items);
+        }
+    },
+
+    // === GALLERY VIEW ===
+    renderGallery: function(items) {
+        if (!items.length) {
+            return '<div class="empty-state card">' +
+                '<p style="font-size:1.5rem;margin-bottom:0.5rem">\ud83d\udcc1</p>' +
+                '<p>No projects yet. Create your first one!</p>' +
+                '<button type="button" class="btn btn-primary" data-action="new-project" style="margin-top:0.75rem">+ New Project</button>' +
+            '</div>';
+        }
+
+        return '<div class="project-gallery">' +
+            items.map(function(item) {
+                var p = item.project;
+                var prog = item.progress;
+                var statusColor = 'var(--status-' + p.status + ')';
+
+                return (
+                    '<article class="gallery-card card-clickable" data-action="open-project" data-id="' + p.id + '">' +
+                        '<div class="gallery-cover" style="background: linear-gradient(135deg, ' + statusColor + '22, ' + statusColor + '08)">' +
+                            '<span class="gallery-icon">' + Utils.escapeHtml(p.icon) + '</span>' +
                         '</div>' +
-                    '</div>' +
-                    Components.renderBadge(Utils.statusLabel(project.status), project.status) +
-                '</div>' +
-                Components.renderProgress(progress.done, progress.total) +
-                (project.target_date ? '<p class="muted" style="margin-top:0.5rem">Target: ' + Utils.escapeHtml(Utils.formatDate(project.target_date)) + '</p>' : '') +
-            '</article>'
+                        '<div class="gallery-body">' +
+                            '<div class="gallery-title">' + Utils.escapeHtml(p.title) + '</div>' +
+                            (p.description ? '<p class="gallery-desc">' + Utils.escapeHtml(p.description).slice(0, 60) + '</p>' : '') +
+                            '<div class="gallery-footer">' +
+                                Components.renderBadge(Utils.statusLabel(p.status), p.status) +
+                                '<span class="muted" style="font-size:0.75rem">' + prog.percent + '%</span>' +
+                            '</div>' +
+                            '<div class="gallery-progress">' +
+                                '<div class="gallery-progress-fill" style="width:' + prog.percent + '%"></div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</article>'
+                );
+            }).join('') +
+        '</div>';
+    },
+
+    // === KANBAN VIEW ===
+    renderKanban: function(items) {
+        var columns = [
+            { id: 'idea', label: 'Idea', color: 'var(--status-idea)' },
+            { id: 'planning', label: 'Planning', color: 'var(--status-planning)' },
+            { id: 'active', label: 'Active', color: 'var(--status-active)' },
+            { id: 'paused', label: 'Paused', color: 'var(--status-paused)' },
+            { id: 'done', label: 'Done', color: 'var(--status-done)' }
+        ];
+
+        return '<div class="kanban-board">' +
+            columns.map(function(col) {
+                var colItems = items.filter(function(item) {
+                    return item.project.status === col.id;
+                });
+
+                return (
+                    '<div class="kanban-column" data-status="' + col.id + '">' +
+                        '<div class="kanban-col-header">' +
+                            '<div class="kanban-col-dot" style="background:' + col.color + '"></div>' +
+                            '<span class="kanban-col-title">' + col.label + '</span>' +
+                            '<span class="kanban-col-count">' + colItems.length + '</span>' +
+                        '</div>' +
+                        '<div class="kanban-col-body">' +
+                            colItems.map(function(item) {
+                                var p = item.project;
+                                var prog = item.progress;
+                                return (
+                                    '<div class="kanban-card card-clickable" data-action="open-project" data-id="' + p.id + '">' +
+                                        '<div class="kanban-card-title">' +
+                                            '<span>' + Utils.escapeHtml(p.icon) + '</span> ' +
+                                            Utils.escapeHtml(p.title) +
+                                        '</div>' +
+                                        (prog.total > 0 ?
+                                            '<div class="kanban-card-progress">' +
+                                                '<div class="gallery-progress"><div class="gallery-progress-fill" style="width:' + prog.percent + '%"></div></div>' +
+                                                '<span class="muted" style="font-size:0.7rem">' + prog.done + '/' + prog.total + '</span>' +
+                                            '</div>' : '') +
+                                        (p.target_date ?
+                                            '<div class="kanban-card-date muted">' + Utils.formatDate(p.target_date) + '</div>' : '') +
+                                    '</div>'
+                                );
+                            }).join('') +
+                            '<button type="button" class="kanban-add-btn" data-action="new-project-status" data-status="' + col.id + '">+ Add</button>' +
+                        '</div>' +
+                    '</div>'
+                );
+            }).join('') +
+        '</div>';
+    },
+
+    // === TABLE VIEW ===
+    renderTable: function(items) {
+        if (!items.length) {
+            return '<div class="empty-state card">' +
+                '<p>No projects yet.</p>' +
+                '<button type="button" class="btn btn-primary" data-action="new-project" style="margin-top:0.75rem">+ New Project</button>' +
+            '</div>';
+        }
+
+        return (
+            '<div class="table-wrap">' +
+                '<table class="data-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th class="table-th-icon"></th>' +
+                            '<th>Title</th>' +
+                            '<th>Status</th>' +
+                            '<th>Progress</th>' +
+                            '<th>Target</th>' +
+                            '<th>Tasks</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' +
+                        items.map(function(item) {
+                            var p = item.project;
+                            var prog = item.progress;
+                            return (
+                                '<tr class="table-row-clickable" data-action="open-project" data-id="' + p.id + '">' +
+                                    '<td class="table-td-icon">' + Utils.escapeHtml(p.icon) + '</td>' +
+                                    '<td>' +
+                                        '<div class="table-title">' + Utils.escapeHtml(p.title) + '</div>' +
+                                        (p.description ? '<div class="table-subtitle">' + Utils.escapeHtml(p.description).slice(0, 50) + '</div>' : '') +
+                                    '</td>' +
+                                    '<td>' + Components.renderBadge(Utils.statusLabel(p.status), p.status) + '</td>' +
+                                    '<td>' +
+                                        '<div class="table-progress-cell">' +
+                                            '<div class="gallery-progress" style="width:60px"><div class="gallery-progress-fill" style="width:' + prog.percent + '%"></div></div>' +
+                                            '<span class="muted" style="font-size:0.75rem">' + prog.percent + '%</span>' +
+                                        '</div>' +
+                                    '</td>' +
+                                    '<td class="muted">' + (p.target_date ? Utils.formatDate(p.target_date) : '\u2014') + '</td>' +
+                                    '<td class="muted">' + prog.tasksDone + '/' + prog.tasksTotal + '</td>' +
+                                '</tr>'
+                            );
+                        }).join('') +
+                    '</tbody>' +
+                '</table>' +
+            '</div>'
         );
     },
 
     bindActions: function(container) {
+        // View switcher
+        container.querySelectorAll('[data-view]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                Projects.currentView = btn.dataset.view;
+                localStorage.setItem('retraq_projects_view', Projects.currentView);
+                Projects.render();
+            });
+        });
+
+        // New project
         container.querySelectorAll('[data-action="new-project"]').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 Projects.showCreateModal();
             });
         });
 
-        container.querySelectorAll('[data-action="open-project"]').forEach(function(card) {
-            card.addEventListener('click', function() {
-                window.location.hash = '#/project/' + card.dataset.id;
+        // New project with pre-set status
+        container.querySelectorAll('[data-action="new-project-status"]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                Projects.showCreateModal(btn.dataset.status);
+            });
+        });
+
+        // Open project
+        container.querySelectorAll('[data-action="open-project"]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                window.location.hash = '#/project/' + el.dataset.id;
             });
         });
     },
 
-    showCreateModal: function() {
+    showCreateModal: function(defaultStatus) {
         var templateOptions = Utils.PROJECT_TEMPLATES.map(function(t) {
             return '<option value="' + t.id + '">' + Utils.escapeHtml(t.icon + ' ' + t.label) + '</option>';
         }).join('');
@@ -95,7 +265,7 @@ const Projects = {
                                 '<label for="project-status">Status</label>' +
                                 '<select id="project-status" name="status">' +
                                     Utils.PROJECT_STATUSES.map(function(s) {
-                                        var selected = s === 'planning' ? ' selected' : '';
+                                        var selected = s === (defaultStatus || 'planning') ? ' selected' : '';
                                         return '<option value="' + s + '"' + selected + '>' + Utils.statusLabel(s) + '</option>';
                                     }).join('') +
                                 '</select>' +
