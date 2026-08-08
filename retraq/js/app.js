@@ -310,6 +310,8 @@ const App = {
         if (path === '/search') return { name: 'search', query: query.get('q') || '' };
         if (path === '/review') return { name: 'review' };
         if (path === '/settings') return { name: 'settings' };
+        if (path === '/graph') return { name: 'graph' };
+
         return { name: 'dashboard' };
     },
 
@@ -396,6 +398,11 @@ const App = {
             if (titleEl) titleEl.textContent = 'Areas';
             if (headerAction) { headerAction.hidden = false; headerAction.textContent = '+ New Area'; }
             Areas.render();
+        } else if (route.name === 'graph') {
+            document.getElementById('view-graph').hidden = false;
+            if (titleEl) titleEl.textContent = 'Knowledge Graph';
+            if (headerAction) headerAction.hidden = true;
+            if (window.Graph && Graph.render) Graph.render();
         } else if (route.name === 'habits') {
             document.getElementById('view-habits').hidden = false;
             if (titleEl) titleEl.textContent = 'Habits';

@@ -46,14 +46,26 @@ const Notes = {
             note ? RetraqDB.getNoteTags(note.id) : Promise.resolve([]),
             note ? RetraqDB.getProjectsForNote(note.id) : Promise.resolve([]),
             RetraqDB.getAllProjects(),
-            RetraqDB.getAllAreas()
+            RetraqDB.getAllAreas(),
+            RetraqDB.getAllNotes()
         ]).then(function(results) {
             var tags = results[0];
             var linkedProjects = results[1];
             var allProjects = results[2];
             var allAreas = results[3];
+            var allNotes = results[4];
             var linkedId = linkedProjects.length ? linkedProjects[0].id : (options.projectId || '');
             var noteAreaId = note ? (note.area_id || '') : '';
+
+            // Calculate Backlinks
+            var backlinks = [];
+            if (note && note.title) {
+                var searchStr = '[[' + note.title.toLowerCase() + ']]';
+                backlinks = allNotes.filter(function(n) {
+                    if (n.id === note.id || !n.content) return false;
+                    return n.content.toLowerCase().indexOf(searchStr) !== -1;
+                });
+            }
 
             var typeOptions = Utils.NOTE_TYPES.map(function(t) {
                 var selected = (note ? note.type : 'note') === t ? ' selected' : '';
@@ -71,6 +83,20 @@ const Notes = {
                     return '<option value="' + a.id + '"' + (a.id === noteAreaId ? ' selected' : '') + '>' +
                         Utils.escapeHtml(a.icon + ' ' + a.name) + '</option>';
                 }).join('');
+
+            var backlinksHtml = '';
+            if (backlinks.length > 0) {
+                backlinksHtml = '<div class="backlinks-section">' +
+                    '<label>Backlinks (' + backlinks.length + ')</label>' +
+                    '<div class="backlinks-list">' +
+                        backlinks.map(function(b) {
+                            return '<div class="backlink-item" data-action="open-backlink" data-id="' + b.id + '">' +
+                                '<span class="nav-icon">🔗</span> ' + Utils.escapeHtml(b.title || 'Untitled') +
+                            '</div>';
+                        }).join('') +
+                    '</div>' +
+                '</div>';
+            }
 
             Components.modal({
                 title: isInbox ? 'Process Inbox' : (isNew ? 'New Note' : 'Edit Note'),
@@ -106,6 +132,7 @@ const Notes = {
                                 '<input id="note-tags" name="tags" value="' + Utils.escapeHtml(tags.map(function(t) { return t.name; }).join(', ')) + '" placeholder="e.g. javascript, pkm">' +
                             '</div>' +
                         '</div>' +
+                        backlinksHtml +
                     '</form>',
                 footer:
                     (note && !isInbox ? '<button type="button" class="btn btn-danger" id="btn-delete-note">Delete</button>' : '') +
@@ -168,6 +195,18 @@ const Notes = {
                             });
                         });
                     }
+
+                    // Open backlink
+                    modal.querySelectorAll('[data-action="open-backlink"]').forEach(function(el) {
+                        el.addEventListener('click', function() {
+                            RetraqDB.getNote(el.dataset.id).then(function(targetNote) {
+                                if (targetNote) {
+                                    close();
+                                    Notes.showEditor({ note: targetNote, onSave: options.onSave });
+                                }
+                            });
+                        });
+                    });
                 }
             });
         });
