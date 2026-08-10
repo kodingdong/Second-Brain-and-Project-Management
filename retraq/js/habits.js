@@ -23,7 +23,10 @@ const Habits = {
                         '<h2 class="section-title">Habits</h2>' +
                         '<p class="muted">Build consistency, track streaks</p>' +
                     '</div>' +
-                    '<button type="button" class="btn btn-primary btn-sm" data-action="new-habit">+ New Habit</button>' +
+                    '<div style="display:flex; gap:0.5rem">' +
+                        (('Notification' in window && Notification.permission === 'default') ? '<button type="button" class="btn btn-sm" id="btn-enable-reminders">🔔 Enable Reminders</button>' : '') +
+                        '<button type="button" class="btn btn-primary btn-sm" data-action="new-habit">+ New Habit</button>' +
+                    '</div>' +
                 '</div>' +
                 (habits.length ?
                     '<div class="section">' +
@@ -42,11 +45,23 @@ const Habits = {
                         }).join('') +
                     '</div>' :
                     '<div class="empty-state card">' +
-                        '<p style="font-size:2rem;margin-bottom:0.5rem">🎯</p>' +
-                        '<p>Belum ada habit. Mulai bangun rutinitas!</p>' +
+                        Utils.getEmptyStateSvg() +
+                        '<p>Belum ada habit yang dilacak. Konsistensi adalah kunci.</p>' +
                         '<button type="button" class="btn btn-primary" data-action="new-habit" style="margin-top:0.75rem">+ New Habit</button>' +
                     '</div>'
                 );
+
+            var reminderBtn = container.querySelector('#btn-enable-reminders');
+            if (reminderBtn) {
+                reminderBtn.addEventListener('click', function() {
+                    Notification.requestPermission().then(function(perm) {
+                        if (perm === 'granted') {
+                            Utils.checkHabitReminders();
+                            Habits.render();
+                        }
+                    });
+                });
+            }
 
             Habits.bindActions(container);
         });

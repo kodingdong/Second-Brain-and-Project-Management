@@ -1,4 +1,4 @@
-const CACHE_NAME = 'retraq-v6';
+const CACHE_NAME = 'retraq-v7';
 const ASSETS = [
     './',
     './index.html',
@@ -9,8 +9,10 @@ const ASSETS = [
     './js/components.js',
     './js/db.js',
     './js/tasks.js',
-    './js/notes.js',
+    './js/markdown.js',
     './js/bilinks.js',
+    './js/link-autocomplete.js',
+    './js/notes.js',
     './js/capture.js',
     './js/inbox.js',
     './js/daily-notes.js',

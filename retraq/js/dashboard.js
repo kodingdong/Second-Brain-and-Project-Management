@@ -110,7 +110,7 @@ const Dashboard = {
                             );
                         }).join('') :
                         '<div class="empty-state card">' +
-                            '<p style="font-size:1.5rem;margin-bottom:0.5rem">\ud83d\ude80</p>' +
+                            Utils.getEmptyStateSvg('projects') +
                             '<p>No active projects yet. Start building!</p>' +
                             '<button type="button" class="btn btn-primary" data-action="new-project" style="margin-top:0.75rem">+ New Project</button>' +
                         '</div>'
@@ -233,11 +233,7 @@ const Dashboard = {
         // Resurface open from dashboard
         container.querySelectorAll('[data-action="dash-resurface-open"]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                RetraqDB.getNote(btn.dataset.id).then(function(note) {
-                    if (note) {
-                        Notes.showEditor({ note: note, onSave: function() { Dashboard.render(); } });
-                    }
-                });
+                window.location.hash = '#/note/' + btn.dataset.id;
             });
         });
     },

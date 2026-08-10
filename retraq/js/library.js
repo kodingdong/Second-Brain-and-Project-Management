@@ -47,7 +47,7 @@ const Library = {
 
     renderList: function(refs) {
         if (!refs || !refs.length) {
-            return '<div class="empty-state card"><p>No references yet. Add bookmarks, articles, and links to build your library.</p></div>';
+            return '<div class="empty-state card">' + Utils.getEmptyStateSvg('notes') + '<p>No references yet. Add bookmarks, articles, and links to build your library.</p></div>';
         }
 
         return refs.map(function(ref) {

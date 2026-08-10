@@ -192,11 +192,7 @@ const Review = {
 
         container.querySelectorAll('[data-action="resurface-open"]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                RetraqDB.getNote(btn.dataset.id).then(function(note) {
-                    if (note) {
-                        Notes.showEditor({ note: note, onSave: function() { Review.render(); } });
-                    }
-                });
+                window.location.hash = '#/note/' + btn.dataset.id;
             });
         });
 

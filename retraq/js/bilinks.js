@@ -148,17 +148,7 @@ const BiLinks = {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
                 var title = link.dataset.createTitle;
-                Notes.showEditor({
-                    content: '',
-                    onSave: function() {
-                        if (onNavigate) onNavigate(null); // refresh
-                    }
-                });
-                // Pre-fill title after modal opens
-                setTimeout(function() {
-                    var titleInput = document.getElementById('note-title');
-                    if (titleInput) titleInput.value = title;
-                }, 100);
+                window.location.hash = '#/note/new?title=' + encodeURIComponent(title);
             });
         });
 

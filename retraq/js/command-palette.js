@@ -89,7 +89,7 @@ const CommandPalette = {
             { type: 'page', icon: '↻', label: 'Review', action: function() { window.location.hash = '#/review'; } },
             { type: 'action', icon: '＋', label: 'New Project', action: function() { Projects.showCreateModal(); } },
             { type: 'action', icon: '✎', label: 'Quick Capture', action: function() { Capture.showQuickCapture(); } },
-            { type: 'action', icon: '📝', label: 'New Note', action: function() { Notes.showEditor({}); } }
+            { type: 'action', icon: '📝', label: 'New Note', action: function() { window.location.hash = '#/note/new'; } }
         ];
 
         CommandPalette.results = items;
@@ -154,7 +154,7 @@ const CommandPalette = {
                     label: n.title,
                     meta: n.type,
                     action: function() {
-                        Notes.showEditor({ note: n, onSave: function() { App.navigate(window.location.hash); } });
+                        window.location.hash = '#/note/' + n.id;
                     }
                 };
             });

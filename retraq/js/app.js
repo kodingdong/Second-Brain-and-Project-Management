@@ -3,55 +3,132 @@ const Settings = {
         var container = document.getElementById('view-settings');
         if (!container) return;
 
+        var srInterval = localStorage.getItem('retraq_sr_interval') || '7';
+
         container.innerHTML =
-            '<div class="section">' +
-                '<h2 class="section-title" style="margin-bottom:0.75rem">Appearance</h2>' +
-                '<div class="card">' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center">' +
-                        '<span>Theme Mode</span>' +
-                        '<select id="theme-select" class="form-group" style="margin:0;width:auto">' +
-                            '<option value="dark">Dark (Default)</option>' +
-                            '<option value="light">Light</option>' +
-                        '</select>' +
+            '<div class="settings-grid">' +
+                // Appearance
+                '<div class="card settings-card">' +
+                    '<h3>🎨 Appearance</h3>' +
+                    '<div class="settings-actions">' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Theme Mode</div>' +
+                                '<div class="settings-action-desc">Switch between dark and light mode</div>' +
+                            '</div>' +
+                            '<select id="theme-select" class="sort-select">' +
+                                '<option value="dark">Dark</option>' +
+                                '<option value="light">Light</option>' +
+                            '</select>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
-            '</div>' +
-            '<div class="section">' +
-                '<h2 class="section-title" style="margin-bottom:0.75rem">Data Backup</h2>' +
-                '<div class="card">' +
-                    '<p class="muted" style="margin-bottom:1rem">Semua data disimpan lokal di IndexedDB browser ini. Export secara berkala untuk backup.</p>' +
-                    '<div style="display:flex;gap:0.5rem;flex-wrap:wrap">' +
-                        '<button type="button" class="btn btn-primary" id="btn-export">Export JSON</button>' +
-                        '<label class="btn" style="cursor:pointer">' +
-                            'Import JSON' +
-                            '<input type="file" id="import-file" accept="application/json,.json" hidden>' +
-                        '</label>' +
+                // Data Backup
+                '<div class="card settings-card">' +
+                    '<h3>💾 Data Backup</h3>' +
+                    '<p class="muted" style="margin-bottom:0.75rem;font-size:0.8rem">All data stored locally in IndexedDB. Export regularly for backup.</p>' +
+                    '<div class="settings-actions">' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Export JSON Backup</div>' +
+                                '<div class="settings-action-desc">Full database backup as JSON file</div>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-primary btn-sm" id="btn-export">Export</button>' +
+                        '</div>' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Import JSON Backup</div>' +
+                                '<div class="settings-action-desc">Restore from a previous backup file</div>' +
+                            '</div>' +
+                            '<label class="btn btn-sm" style="cursor:pointer">' +
+                                'Import' +
+                                '<input type="file" id="import-file" accept="application/json,.json" hidden>' +
+                            '</label>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
-            '</div>' +
-            '<div class="section">' +
-                '<h2 class="section-title" style="margin-bottom:0.75rem">Seed Data</h2>' +
-                '<div class="card">' +
-                    '<p class="muted" style="margin-bottom:1rem">Simpan data saat ini sebagai seed. File <code>seed.json</code> akan otomatis di-load saat app pertama kali dibuka di origin baru (setelah deploy).</p>' +
-                    '<div style="display:flex;gap:0.5rem;flex-wrap:wrap">' +
-                        '<button type="button" class="btn" id="btn-save-seed">💾 Save as Seed</button>' +
-                        '<button type="button" class="btn btn-danger" id="btn-clear-data">🗑️ Clear All Data</button>' +
+                // Export Markdown
+                '<div class="card settings-card">' +
+                    '<h3>📝 Export as Markdown</h3>' +
+                    '<p class="muted" style="margin-bottom:0.75rem;font-size:0.8rem">Download all notes as .md files. Compatible with Obsidian vaults.</p>' +
+                    '<div class="settings-actions">' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Export All Notes</div>' +
+                                '<div class="settings-action-desc">Each note becomes a separate .md file</div>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-sm" id="btn-export-md">Export .md</button>' +
+                        '</div>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
-            '</div>' +
-            '<div class="section">' +
-                '<h2 class="section-title" style="margin-bottom:0.75rem">Tips</h2>' +
-                '<div class="card">' +
-                    '<p>Tap <strong>+</strong> di bottom bar untuk quick capture ke Inbox.</p>' +
-                    '<p style="margin-top:0.35rem" class="muted">Gunakan [[Judul Note]] di konten untuk membuat bi-directional link antar catatan.</p>' +
+                // Templates
+                '<div class="card settings-card">' +
+                    '<h3>📝 Templates</h3>' +
+                    '<p class="muted" style="margin-bottom:0.75rem;font-size:0.8rem">Define default content for new notes.</p>' +
+                    '<div class="settings-actions">' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Daily Note Template</div>' +
+                                '<div class="settings-action-desc">Default layout for new daily notes</div>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-sm" id="btn-edit-tpl-daily">Edit</button>' +
+                        '</div>' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">General Note Template</div>' +
+                                '<div class="settings-action-desc">Default layout for standard notes</div>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-sm" id="btn-edit-tpl-note">Edit</button>' +
+                        '</div>' +
+                    '</div>' +
                 '</div>' +
-            '</div>' +
-            '<div class="section">' +
-                '<h2 class="section-title" style="margin-bottom:0.75rem">About</h2>' +
-                '<div class="card">' +
-                    '<p><strong>Retraq</strong> — v1.0 Obsidian × Notion Redesign</p>' +
-                    '<p class="muted" style="margin-top:0.5rem">Vanilla JS · IndexedDB · Offline-first PWA</p>' +
-                    '<p class="muted" style="margin-top:0.25rem"><kbd>Ctrl+K</kbd> Command Palette · <kbd>N</kbd> New Project · <kbd>C</kbd> Quick Capture</p>' +
+                // Spaced Repetition
+                '<div class="card settings-card">' +
+                    '<h3>🧠 Active Brain</h3>' +
+                    '<div class="settings-actions">' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Resurface Interval</div>' +
+                                '<div class="settings-action-desc">Days before old notes appear in Review queue</div>' +
+                            '</div>' +
+                            '<select id="sr-interval" class="sort-select">' +
+                                '<option value="3"' + (srInterval === '3' ? ' selected' : '') + '>3 days</option>' +
+                                '<option value="5"' + (srInterval === '5' ? ' selected' : '') + '>5 days</option>' +
+                                '<option value="7"' + (srInterval === '7' ? ' selected' : '') + '>7 days</option>' +
+                                '<option value="14"' + (srInterval === '14' ? ' selected' : '') + '>14 days</option>' +
+                                '<option value="30"' + (srInterval === '30' ? ' selected' : '') + '>30 days</option>' +
+                            '</select>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                // Seed & Danger Zone
+                '<div class="card settings-card">' +
+                    '<h3>⚙️ Advanced</h3>' +
+                    '<div class="settings-actions">' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label">Save as Seed Data</div>' +
+                                '<div class="settings-action-desc">For deployment — auto-loads on fresh installs</div>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-sm" id="btn-save-seed">💾 Save</button>' +
+                        '</div>' +
+                        '<div class="settings-action-row">' +
+                            '<div>' +
+                                '<div class="settings-action-label" style="color:var(--color-danger)">Clear All Data</div>' +
+                                '<div class="settings-action-desc">Permanently delete everything</div>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-sm btn-danger" id="btn-clear-data">🗑️ Clear</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                // About
+                '<div class="card settings-card">' +
+                    '<h3>ℹ️ About Retraq</h3>' +
+                    '<p style="font-size:0.85rem"><strong>Retraq</strong> — v2.0</p>' +
+                    '<p class="muted" style="font-size:0.8rem;margin-top:0.35rem">Vanilla JS · IndexedDB · Offline-first PWA</p>' +
+                    '<p class="muted" style="font-size:0.8rem;margin-top:0.2rem"><kbd>Ctrl+K</kbd> Search · <kbd>N</kbd> New Project · <kbd>C</kbd> Quick Capture</p>' +
+                    '<p class="muted" style="font-size:0.75rem;margin-top:0.5rem">Obsidian × Notion — Second Brain & Project Management</p>' +
                 '</div>' +
             '</div>';
 
@@ -128,6 +205,92 @@ const Settings = {
                 App.navigate('#/');
             });
         });
+
+        // Export to Markdown
+        var exportMdBtn = container.querySelector('#btn-export-md');
+        if (exportMdBtn) {
+            exportMdBtn.addEventListener('click', function() {
+                RetraqDB.getAllNotes().then(function(notes) {
+                    if (!notes.length) {
+                        Components.toast('No notes to export', 'error');
+                        return;
+                    }
+
+                    // Build a combined markdown file (since we can't create ZIP without a lib)
+                    var combined = '# Retraq Notes Export\n';
+                    combined += '> Exported on ' + new Date().toLocaleDateString() + '\n\n---\n\n';
+
+                    notes.forEach(function(note) {
+                        combined += '## ' + (note.title || 'Untitled') + '\n';
+                        combined += '**Type:** ' + (note.type || 'note') + ' | ';
+                        combined += '**Updated:** ' + (note.updated_at || '').slice(0, 10) + '\n\n';
+                        combined += (note.content || '_Empty note_') + '\n\n';
+                        combined += '---\n\n';
+                    });
+
+                    var blob = new Blob([combined], { type: 'text/markdown;charset=utf-8' });
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'retraq-notes-' + Utils.today() + '.md';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    Components.toast(notes.length + ' notes exported as Markdown');
+                });
+            });
+        }
+
+        // Templates
+        var editDailyBtn = container.querySelector('#btn-edit-tpl-daily');
+        if (editDailyBtn) {
+            editDailyBtn.addEventListener('click', function() {
+                var currentTpl = localStorage.getItem('retraq_tpl_daily') || '';
+                Components.modal({
+                    title: 'Daily Note Template',
+                    body: '<div class="form-group"><textarea id="tpl-daily-input" class="form-control" rows="8" placeholder="# Daily Note\n- [ ] Task 1...">' + Utils.escapeHtml(currentTpl) + '</textarea></div>' +
+                          '<p class="muted" style="font-size:0.8rem">This markdown will be pre-filled when creating new daily notes.</p>',
+                    footer: '<button type="button" class="btn" data-modal-close>Cancel</button><button type="button" class="btn btn-primary" id="btn-save-tpl-daily">Save</button>',
+                    onMount: function(modal, close) {
+                        modal.querySelector('#btn-save-tpl-daily').addEventListener('click', function() {
+                            var val = modal.querySelector('#tpl-daily-input').value;
+                            localStorage.setItem('retraq_tpl_daily', val);
+                            Components.toast('Daily template saved');
+                            close();
+                        });
+                    }
+                });
+            });
+        }
+
+        var editNoteBtn = container.querySelector('#btn-edit-tpl-note');
+        if (editNoteBtn) {
+            editNoteBtn.addEventListener('click', function() {
+                var currentTpl = localStorage.getItem('retraq_tpl_note') || '';
+                Components.modal({
+                    title: 'General Note Template',
+                    body: '<div class="form-group"><textarea id="tpl-note-input" class="form-control" rows="8" placeholder="# Title\n\nContext...">' + Utils.escapeHtml(currentTpl) + '</textarea></div>' +
+                          '<p class="muted" style="font-size:0.8rem">This markdown will be pre-filled when creating standard notes.</p>',
+                    footer: '<button type="button" class="btn" data-modal-close>Cancel</button><button type="button" class="btn btn-primary" id="btn-save-tpl-note">Save</button>',
+                    onMount: function(modal, close) {
+                        modal.querySelector('#btn-save-tpl-note').addEventListener('click', function() {
+                            var val = modal.querySelector('#tpl-note-input').value;
+                            localStorage.setItem('retraq_tpl_note', val);
+                            Components.toast('Note template saved');
+                            close();
+                        });
+                    }
+                });
+            });
+        }
+
+        // Spaced repetition interval
+        var srSelect = container.querySelector('#sr-interval');
+        if (srSelect) {
+            srSelect.addEventListener('change', function() {
+                localStorage.setItem('retraq_sr_interval', srSelect.value);
+                Components.toast('Resurface interval set to ' + srSelect.value + ' days');
+            });
+        }
     }
 };
 
@@ -149,6 +312,7 @@ const App = {
             CommandPalette.initShortcuts();
             App.bindEvents();
             App.updateInboxBadge();
+            Utils.checkHabitReminders();
             App.navigate(window.location.hash || '#/');
         }).catch(function(err) {
             console.error(err);
@@ -328,6 +492,10 @@ const App = {
         if (projectMatch) {
             return { name: 'project-detail', projectId: projectMatch[1] };
         }
+        var noteMatch = path.match(/^\/note\/([^/]+)/);
+        if (noteMatch) {
+            return { name: 'note-editor', noteId: noteMatch[1], projectId: query.get('project') || '', title: query.get('title') || '' };
+        }
         var dailyMatch = path.match(/^\/daily(?:\/(\d{4}-\d{2}-\d{2}))?/);
         if (dailyMatch) {
             return { name: 'daily', date: dailyMatch[1] || Utils.today() };
@@ -392,6 +560,11 @@ const App = {
             if (titleEl) titleEl.textContent = 'Dashboard';
             if (headerAction) { headerAction.hidden = false; headerAction.textContent = '+ New Project'; }
             Dashboard.render();
+        } else if (route.name === 'note-editor') {
+            document.getElementById('view-note').hidden = false;
+            if (headerAction) headerAction.hidden = true;
+            if (titleEl) titleEl.textContent = 'Edit Note';
+            Notes.renderEditor(route.noteId, route.projectId, route.title);
         } else if (route.name === 'projects') {
             document.getElementById('view-projects').hidden = false;
             if (titleEl) titleEl.textContent = 'Projects';

@@ -14,6 +14,10 @@ const Search = {
         var input = container.querySelector('#search-input');
         input.focus();
 
+        if (Search.worker) {
+            Search.worker.postMessage({ type: 'refresh' });
+        }
+
         function runSearch() {
             var q = input.value.trim();
             window.location.hash = '#/search' + (q ? '?q=' + encodeURIComponent(q) : '');
@@ -37,90 +41,98 @@ const Search = {
         if (!resultsEl) return;
 
         if (!query.trim()) {
-            resultsEl.innerHTML = '<div class="empty-state card"><p>Type to search across your brain.</p></div>';
+            resultsEl.innerHTML = '<div class="empty-state card">' + Utils.getEmptyStateSvg('search') + '<p>Type to search across your brain.</p></div>';
             return;
         }
 
-        RetraqDB.searchAll(query).then(function(results) {
-            // Also search references
-            RetraqDB.getAllReferences().then(function(allRefs) {
-                var q = query.trim().toLowerCase();
-                var refs = allRefs.filter(function(r) {
-                    return (r.title + ' ' + r.url + ' ' + (r.notes || '')).toLowerCase().indexOf(q) !== -1;
-                });
-
-                var total = results.projects.length + results.tasks.length + results.notes.length + refs.length;
-
-                if (!total) {
-                    resultsEl.innerHTML = '<div class="empty-state card"><p>No results for "' + Utils.escapeHtml(query) + '"</p></div>';
-                    return;
+        if (!Search.worker) {
+            Search.worker = new Worker('js/search-worker.js');
+            Search.worker.onmessage = function(e) {
+                var data = e.data;
+                if (data.type === 'results') {
+                    if (data.query === Search.lastQuery) {
+                        Search._renderHTML(data.results, data.query);
+                    }
                 }
+            };
+        }
 
-                var html = '<p class="muted" style="margin-bottom:1rem">' + total + ' results</p>';
+        Search.lastQuery = query;
+        Search.worker.postMessage({ type: 'search', query: query });
+    },
 
-                if (results.projects.length) {
-                    html += '<div class="section"><h3 class="section-title">Projects (' + results.projects.length + ')</h3>';
-                    html += results.projects.map(function(p) {
-                        return (
-                            '<article class="card card-clickable" onclick="window.location.hash=\'#/project/' + p.id + '\'">' +
-                                '<strong>' + Utils.escapeHtml(p.icon + ' ' + p.title) + '</strong>' +
-                                (p.description ? '<p class="muted" style="margin-top:0.25rem">' + Utils.escapeHtml(p.description) + '</p>' : '') +
-                            '</article>'
-                        );
-                    }).join('');
-                    html += '</div>';
+    _renderHTML: function(results, query) {
+        var resultsEl = document.getElementById('search-results');
+        if (!resultsEl) return;
+
+        var total = results.projects.length + results.tasks.length + results.notes.length + results.refs.length;
+
+        if (!total) {
+            resultsEl.innerHTML = '<div class="empty-state card">' + Utils.getEmptyStateSvg('search') + '<p>No results for "' + Utils.escapeHtml(query) + '"</p></div>';
+            return;
+        }
+
+        var html = '<p class="muted" style="margin-bottom:1rem">' + total + ' results</p>';
+
+        if (results.projects.length) {
+            html += '<div class="section"><h3 class="section-title">Projects (' + results.projects.length + ')</h3>';
+            html += results.projects.map(function(p) {
+                return (
+                    '<article class="card card-clickable" onclick="window.location.hash=\'#/project/' + p.id + '\'">' +
+                        '<strong>' + Utils.escapeHtml(p.icon + ' ' + p.title) + '</strong>' +
+                        (p.description ? '<p class="muted" style="margin-top:0.25rem">' + Utils.escapeHtml(p.description) + '</p>' : '') +
+                    '</article>'
+                );
+            }).join('');
+            html += '</div>';
+        }
+
+        if (results.tasks.length) {
+            html += '<div class="section"><h3 class="section-title">Tasks (' + results.tasks.length + ')</h3>';
+            html += '<div class="task-list">';
+            html += results.tasks.map(function(task) {
+                return (
+                    '<div class="task-item" onclick="window.location.hash=\'#/project/' + task.project_id + '\'">' +
+                        '<div class="task-body"><div class="task-title">' + Utils.escapeHtml(task.title) + '</div></div>' +
+                    '</div>'
+                );
+            }).join('');
+            html += '</div></div>';
+        }
+
+        if (results.notes.length) {
+            html += '<div class="section"><h3 class="section-title">Notes (' + results.notes.length + ')</h3>';
+            html += results.notes.map(function(note) {
+                if (note.type === 'daily' && note.daily_date) {
+                    return (
+                        '<article class="card card-clickable" onclick="window.location.hash=\'#/daily/' + note.daily_date + '\'">' +
+                            '<strong>' + Utils.escapeHtml(note.title) + '</strong>' +
+                            '<p class="note-preview">' + Utils.escapeHtml((note.content || '').slice(0, 120)) + '</p>' +
+                        '</article>'
+                    );
                 }
+                return Notes.renderNoteCard(note);
+            }).join('');
+            html += '</div>';
+        }
 
-                if (results.tasks.length) {
-                    html += '<div class="section"><h3 class="section-title">Tasks (' + results.tasks.length + ')</h3>';
-                    html += '<div class="task-list">';
-                    html += results.tasks.map(function(task) {
-                        return (
-                            '<div class="task-item" onclick="window.location.hash=\'#/project/' + task.project_id + '\'">' +
-                                '<div class="task-body"><div class="task-title">' + Utils.escapeHtml(task.title) + '</div></div>' +
-                            '</div>'
-                        );
-                    }).join('');
-                    html += '</div></div>';
-                }
+        if (results.refs.length) {
+            html += '<div class="section"><h3 class="section-title">References (' + results.refs.length + ')</h3>';
+            html += results.refs.map(function(ref) {
+                return (
+                    '<article class="card card-clickable" onclick="window.location.hash=\'#/library\'">' +
+                        '<strong>🔗 ' + Utils.escapeHtml(ref.title) + '</strong>' +
+                        '<p class="muted" style="margin-top:0.25rem">' + Utils.escapeHtml(ref.url) + '</p>' +
+                    '</article>'
+                );
+            }).join('');
+            html += '</div>';
+        }
 
-                if (results.notes.length) {
-                    html += '<div class="section"><h3 class="section-title">Notes (' + results.notes.length + ')</h3>';
-                    html += results.notes.map(function(note) {
-                        if (note.type === 'daily' && note.daily_date) {
-                            return (
-                                '<article class="card card-clickable" onclick="window.location.hash=\'#/daily/' + note.daily_date + '\'">' +
-                                    '<strong>' + Utils.escapeHtml(note.title) + '</strong>' +
-                                    '<p class="note-preview">' + Utils.escapeHtml((note.content || '').slice(0, 120)) + '</p>' +
-                                '</article>'
-                            );
-                        }
-                        return Notes.renderNoteCard(note);
-                    }).join('');
-                    html += '</div>';
-                }
+        resultsEl.innerHTML = html;
 
-                if (refs.length) {
-                    html += '<div class="section"><h3 class="section-title">References (' + refs.length + ')</h3>';
-                    html += refs.map(function(ref) {
-                        return (
-                            '<article class="card card-clickable" onclick="window.location.hash=\'#/library\'">' +
-                                '<strong>🔗 ' + Utils.escapeHtml(ref.title) + '</strong>' +
-                                '<p class="muted" style="margin-top:0.25rem">' + Utils.escapeHtml(ref.url) + '</p>' +
-                            '</article>'
-                        );
-                    }).join('');
-                    html += '</div>';
-                }
-
-                resultsEl.innerHTML = html;
-
-                Notes.bindNoteCards(resultsEl, function(noteId) {
-                    RetraqDB.getNote(noteId).then(function(note) {
-                        Notes.showEditor({ note: note, onSave: function() { Search.renderResults(query); } });
-                    });
-                });
-            });
+        Notes.bindNoteCards(resultsEl, function(noteId) {
+            window.location.hash = '#/note/' + noteId;
         });
     }
 };

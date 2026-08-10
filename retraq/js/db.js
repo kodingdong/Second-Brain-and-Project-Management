@@ -181,6 +181,15 @@ const RetraqDB = {
         });
     },
 
+    getActivityLog: function(projectId, limit) {
+        return getByIndex('activity_log', 'project_id', projectId).then(function(logs) {
+            logs.sort(function(a, b) {
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+            return limit ? logs.slice(0, limit) : logs;
+        });
+    },
+
     touchProject: function(projectId) {
         return getById('projects', projectId).then(function(project) {
             if (!project) return null;
@@ -582,9 +591,15 @@ const RetraqDB = {
         date = date || Utils.today();
         return getByIndex('notes', 'daily_date', date).then(function(notes) {
             if (notes.length) return notes[0];
+            
+            var initialContent = '';
+            if (typeof localStorage !== 'undefined') {
+                initialContent = localStorage.getItem('retraq_tpl_daily') || '';
+            }
+            
             return RetraqDB.createNote({
                 title: 'Daily · ' + Utils.formatDate(date),
-                content: '',
+                content: initialContent,
                 type: 'daily',
                 status: 'active',
                 daily_date: date
@@ -999,4 +1014,5 @@ const RetraqDB = {
     }
 };
 
-window.RetraqDB = RetraqDB;
+if (typeof window !== 'undefined') window.RetraqDB = RetraqDB;
+if (typeof self !== 'undefined') self.RetraqDB = RetraqDB;

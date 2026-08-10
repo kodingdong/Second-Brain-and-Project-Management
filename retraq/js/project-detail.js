@@ -23,12 +23,14 @@ const ProjectDetail = {
                 RetraqDB.getProjectProgress(projectId),
                 RetraqDB.getTasksByProject(projectId),
                 RetraqDB.getMilestonesByProject(projectId),
-                RetraqDB.getNotesByProject(projectId)
+                RetraqDB.getNotesByProject(projectId),
+                RetraqDB.getActivityLog(projectId, 50)
             ]).then(function(results) {
                 var progress = results[0];
                 var tasks = results[1];
                 var milestones = results[2];
                 var notes = results[3];
+                var logs = results[4];
 
                 container.innerHTML =
                     '<div class="project-overview card">' +
@@ -57,6 +59,7 @@ const ProjectDetail = {
                         '<button type="button" class="tab' + (ProjectDetail.activeTab === 'tasks' ? ' active' : '') + '" data-tab="tasks">Tasks (' + tasks.length + ')</button>' +
                         '<button type="button" class="tab' + (ProjectDetail.activeTab === 'milestones' ? ' active' : '') + '" data-tab="milestones">Milestones (' + milestones.length + ')</button>' +
                         '<button type="button" class="tab' + (ProjectDetail.activeTab === 'notes' ? ' active' : '') + '" data-tab="notes">Notes (' + notes.length + ')</button>' +
+                        '<button type="button" class="tab' + (ProjectDetail.activeTab === 'activity' ? ' active' : '') + '" data-tab="activity">Activity (' + logs.length + ')</button>' +
                     '</div>' +
                     '<div id="project-tab-content"></div>';
 
@@ -64,6 +67,8 @@ const ProjectDetail = {
                     ProjectDetail.renderMilestonesTab(project, milestones);
                 } else if (ProjectDetail.activeTab === 'notes') {
                     ProjectDetail.renderNotesTab(project, notes);
+                } else if (ProjectDetail.activeTab === 'activity') {
+                    ProjectDetail.renderActivityTab(project, logs);
                 } else {
                     ProjectDetail.renderTasksTab(project, tasks);
                 }
@@ -170,7 +175,7 @@ const ProjectDetail = {
                         '</div>'
                     );
                 }).join('') :
-                '<div class="empty-state card"><p>Belum ada milestone. Tambahkan checkpoint proyek di atas.</p></div>'
+                '<div class="empty-state card">' + Utils.getEmptyStateSvg() + '<p>Belum ada milestone. Tambahkan checkpoint proyek di atas.</p></div>'
             );
 
         var msInput = tab.querySelector('#new-milestone-input');
@@ -220,25 +225,110 @@ const ProjectDetail = {
                 notes.map(function(note) {
                     return Notes.renderNoteCard(note);
                 }).join('') :
-                '<div class="empty-state card"><p>Belum ada catatan ter-link ke proyek ini.</p></div>'
+                '<div class="empty-state card">' + Utils.getEmptyStateSvg('notes') + '<p>Belum ada catatan ter-link ke proyek ini.</p></div>'
             );
 
         tab.querySelector('#btn-add-project-note').addEventListener('click', function() {
-            Notes.showEditor({
-                projectId: project.id,
-                onSave: function() { ProjectDetail.render(project.id, 'notes'); }
-            });
+            window.location.hash = '#/note/new?project=' + project.id;
         });
 
         Notes.bindNoteCards(tab, function(noteId) {
-            RetraqDB.getNote(noteId).then(function(note) {
-                Notes.showEditor({
-                    note: note,
-                    projectId: project.id,
-                    onSave: function() { ProjectDetail.render(project.id, 'notes'); }
-                });
-            });
+            window.location.hash = '#/note/' + noteId;
         });
+    },
+
+    // === ACTIVITY LOG TAB ===
+    renderActivityTab: function(project, logs) {
+        var tab = document.getElementById('project-tab-content');
+        if (!tab) return;
+
+        if (!logs.length) {
+            tab.innerHTML =
+                '<div class="empty-state card">' +
+                    '<p style="font-size:1.5rem;margin-bottom:0.5rem">📋</p>' +
+                    '<p>No activity recorded yet.</p>' +
+                '</div>';
+            return;
+        }
+
+        // Group logs by date
+        var groups = {};
+        logs.forEach(function(log) {
+            var dateKey = log.created_at.slice(0, 10);
+            if (!groups[dateKey]) groups[dateKey] = [];
+            groups[dateKey].push(log);
+        });
+
+        var html = '<div class="activity-timeline">';
+
+        Object.keys(groups).forEach(function(dateKey) {
+            var isToday = dateKey === Utils.today();
+            var dateLabel = isToday ? 'Today' : Utils.formatDate(dateKey);
+
+            html += '<div class="activity-date-group">' +
+                '<div class="activity-date-label">' + dateLabel + '</div>' +
+                '<div class="activity-items">';
+
+            groups[dateKey].forEach(function(log) {
+                var icon = ProjectDetail._getActivityIcon(log.entity_type, log.action);
+                var label = ProjectDetail._getActivityLabel(log.entity_type, log.action);
+                var time = new Date(log.created_at).toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                html += '<div class="activity-item">' +
+                    '<span class="activity-icon">' + icon + '</span>' +
+                    '<div class="activity-body">' +
+                        '<span class="activity-label">' + label + '</span>' +
+                        '<span class="activity-time">' + time + '</span>' +
+                    '</div>' +
+                '</div>';
+            });
+
+            html += '</div></div>';
+        });
+
+        html += '</div>';
+        tab.innerHTML = html;
+    },
+
+    _getActivityIcon: function(entityType, action) {
+        var icons = {
+            'project_created': '🚀',
+            'project_updated': '✏️',
+            'task_created': '➕',
+            'task_updated': '✏️',
+            'task_completed': '✅',
+            'task_uncompleted': '↩️',
+            'task_deleted': '🗑️',
+            'milestone_created': '🏁',
+            'milestone_completed': '🏆',
+            'milestone_uncompleted': '↩️',
+            'milestone_deleted': '🗑️',
+            'note_linked': '🔗',
+            'note_created': '📝'
+        };
+        return icons[entityType + '_' + action] || '📌';
+    },
+
+    _getActivityLabel: function(entityType, action) {
+        var labels = {
+            'project_created': 'Project created',
+            'project_updated': 'Project updated',
+            'task_created': 'Task added',
+            'task_updated': 'Task updated',
+            'task_completed': 'Task completed',
+            'task_uncompleted': 'Task reopened',
+            'task_deleted': 'Task deleted',
+            'milestone_created': 'Milestone added',
+            'milestone_completed': 'Milestone completed',
+            'milestone_uncompleted': 'Milestone reopened',
+            'milestone_deleted': 'Milestone deleted',
+            'note_linked': 'Note linked',
+            'note_created': 'Note created'
+        };
+        return labels[entityType + '_' + action] || (action + ' ' + entityType);
     },
 
     bindActions: function(container, project) {
@@ -253,6 +343,10 @@ const ProjectDetail = {
                 } else if (tabBtn.dataset.tab === 'notes') {
                     RetraqDB.getNotesByProject(project.id).then(function(notes) {
                         ProjectDetail.renderNotesTab(project, notes);
+                    });
+                } else if (tabBtn.dataset.tab === 'activity') {
+                    RetraqDB.getActivityLog(project.id, 50).then(function(logs) {
+                        ProjectDetail.renderActivityTab(project, logs);
                     });
                 } else {
                     RetraqDB.getTasksByProject(project.id).then(function(tasks) {

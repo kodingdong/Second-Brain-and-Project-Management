@@ -7,6 +7,8 @@ const Graph = {
     ctx: null,
     nodes: [],
     edges: [],
+    allNodes: [],
+    allEdges: [],
     animId: null,
     isDragging: false,
     dragNode: null,
@@ -18,6 +20,14 @@ const Graph = {
     panY: 0,
     lastMouse: { x: 0, y: 0 },
     isPanning: false,
+    filters: {
+        note: true,
+        daily: true,
+        idea: true,
+        reference: true,
+        project: true,
+        orphans: true
+    },
 
     COLORS: {
         note: '#7c3aed',
@@ -37,6 +47,20 @@ const Graph = {
         var container = document.getElementById('view-graph');
         if (!container) return;
 
+        // Restore filter preferences
+        var savedFilters = localStorage.getItem('retraq_graph_filters');
+        if (savedFilters) {
+            try { Graph.filters = JSON.parse(savedFilters); } catch(e) {}
+        }
+
+        var filterToggles = [
+            { id: 'note', label: 'Notes', color: '#7c3aed' },
+            { id: 'daily', label: 'Daily', color: '#3b82f6' },
+            { id: 'idea', label: 'Ideas', color: '#f59e0b' },
+            { id: 'reference', label: 'Refs', color: '#10b981' },
+            { id: 'project', label: 'Projects', color: '#ec4899' }
+        ];
+
         container.innerHTML =
             '<div class="graph-header">' +
                 '<div>' +
@@ -48,6 +72,18 @@ const Graph = {
                     '<button type="button" class="btn btn-sm" id="graph-zoom-out" title="Zoom out">\u2212</button>' +
                     '<button type="button" class="btn btn-sm" id="graph-reset" title="Reset view">Reset</button>' +
                 '</div>' +
+            '</div>' +
+            '<div class="graph-filter-bar">' +
+                filterToggles.map(function(f) {
+                    var isActive = Graph.filters[f.id] !== false;
+                    return '<button type="button" class="graph-filter-btn' + (isActive ? ' active' : '') +
+                        '" data-graph-filter="' + f.id + '" style="--filter-color:' + f.color + '">' +
+                        '<span class="graph-dot" style="background:' + f.color + '"></span>' +
+                        f.label + '</button>';
+                }).join('') +
+                '<button type="button" class="graph-filter-btn' + (Graph.filters.orphans !== false ? ' active' : '') +
+                    '" data-graph-filter="orphans" style="--filter-color:var(--color-text-muted)">' +
+                    'Orphans</button>' +
             '</div>' +
             '<div class="graph-container" id="graph-canvas-wrap">' +
                 '<canvas id="graph-canvas"></canvas>' +
@@ -62,10 +98,57 @@ const Graph = {
 
         Graph.initCanvas();
         Graph.loadData().then(function() {
+            Graph.applyFilters();
             Graph.startSimulation();
         });
 
         Graph.bindControls();
+        Graph.bindFilters(container);
+    },
+
+    bindFilters: function(container) {
+        container.querySelectorAll('[data-graph-filter]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var filterId = btn.dataset.graphFilter;
+                Graph.filters[filterId] = !Graph.filters[filterId];
+                btn.classList.toggle('active', Graph.filters[filterId]);
+                localStorage.setItem('retraq_graph_filters', JSON.stringify(Graph.filters));
+                Graph.applyFilters();
+                Graph.draw();
+            });
+        });
+    },
+
+    applyFilters: function() {
+        var visibleIds = {};
+        var nodeById = {};
+
+        Graph.allNodes.forEach(function(n) { nodeById[n.id] = n; });
+
+        Graph.nodes = Graph.allNodes.filter(function(node) {
+            var type = node.type || 'note';
+            if (type === 'snippet' || type === 'til') type = 'note';
+            if (Graph.filters[type] === false) return false;
+            if (Graph.filters.orphans === false && node.connections === 0) return false;
+            visibleIds[node.id] = true;
+            return true;
+        });
+
+        // Resolve string IDs to node objects for simulation/drawing
+        Graph.edges = [];
+        Graph.allEdges.forEach(function(edge) {
+            if (visibleIds[edge.source] && visibleIds[edge.target]) {
+                Graph.edges.push({
+                    source: nodeById[edge.source],
+                    target: nodeById[edge.target]
+                });
+            }
+        });
+
+        var stats = document.getElementById('graph-stats');
+        if (stats) {
+            stats.textContent = Graph.nodes.length + ' nodes \u00b7 ' + Graph.edges.length + ' connections';
+        }
     },
 
     initCanvas: function() {
@@ -106,8 +189,8 @@ const Graph = {
             var notes = results[0].filter(function(n) { return n.status !== 'archived'; });
             var projects = results[1];
             var nodeMap = {};
-            Graph.nodes = [];
-            Graph.edges = [];
+            Graph.allNodes = [];
+            Graph.allEdges = [];
 
             var cx = (Graph.canvas.width / (window.devicePixelRatio || 1)) / 2;
             var cy = (Graph.canvas.height / (window.devicePixelRatio || 1)) / 2;
@@ -128,7 +211,7 @@ const Graph = {
                     connections: 0,
                     data: note
                 };
-                Graph.nodes.push(node);
+                Graph.allNodes.push(node);
                 nodeMap[note.id] = node;
             });
 
@@ -147,7 +230,7 @@ const Graph = {
                     connections: 0,
                     data: proj
                 };
-                Graph.nodes.push(node);
+                Graph.allNodes.push(node);
                 nodeMap['proj-' + proj.id] = node;
             });
 
@@ -158,14 +241,13 @@ const Graph = {
                 var match;
                 while ((match = wikiLinkRegex.exec(note.content)) !== null) {
                     var targetTitle = match[1].trim().toLowerCase();
-                    // Find matching note
-                    var targetNode = Graph.nodes.find(function(n) {
+                    var targetNode = Graph.allNodes.find(function(n) {
                         return n.noteId && n.label.toLowerCase() === targetTitle;
                     });
                     if (targetNode && nodeMap[note.id]) {
-                        Graph.edges.push({
-                            source: nodeMap[note.id],
-                            target: targetNode
+                        Graph.allEdges.push({
+                            source: nodeMap[note.id].id,
+                            target: targetNode.id
                         });
                         nodeMap[note.id].connections++;
                         targetNode.connections++;
@@ -180,9 +262,9 @@ const Graph = {
                         var projNode = nodeMap['proj-' + lp.id];
                         var noteNode = nodeMap[note.id];
                         if (projNode && noteNode) {
-                            Graph.edges.push({
-                                source: noteNode,
-                                target: projNode
+                            Graph.allEdges.push({
+                                source: noteNode.id,
+                                target: projNode.id
                             });
                             noteNode.connections++;
                             projNode.connections++;
@@ -191,10 +273,9 @@ const Graph = {
                 });
             }));
         }).then(function() {
-            var stats = document.getElementById('graph-stats');
-            if (stats) {
-                stats.textContent = Graph.nodes.length + ' nodes \u00b7 ' + Graph.edges.length + ' connections';
-            }
+            // Copy to working arrays
+            Graph.nodes = Graph.allNodes.slice();
+            Graph.edges = Graph.allEdges.slice();
         });
     },
 
@@ -407,10 +488,7 @@ const Graph = {
         if (!node) return;
 
         if (node.noteId) {
-            Notes.showEditor({
-                note: node.data,
-                onSave: function() { Graph.render(); }
-            });
+            window.location.hash = '#/note/' + node.noteId;
         } else if (node.projectId) {
             window.location.hash = '#/project/' + node.projectId;
         }

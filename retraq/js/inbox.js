@@ -17,6 +17,7 @@ const Inbox = {
                         return Inbox.renderInboxItem(note);
                     }).join('') :
                     '<div class="empty-state card">' +
+                        Utils.getEmptyStateSvg('inbox') +
                         '<p>Inbox kosong. Tap <strong>+</strong> di bottom bar untuk quick capture.</p>' +
                         '<button type="button" class="btn btn-primary" data-action="quick-capture">Quick Capture</button>' +
                     '</div>'
@@ -28,9 +29,7 @@ const Inbox = {
 
             container.querySelectorAll('[data-action="process"]').forEach(function(btn) {
                 btn.addEventListener('click', function() {
-                    RetraqDB.getNote(btn.dataset.id).then(function(note) {
-                        Notes.showEditor({ note: note, onSave: function() { Inbox.render(); } });
-                    });
+                    window.location.hash = '#/note/' + btn.dataset.id;
                 });
             });
 

@@ -36,25 +36,29 @@ const Notes = {
         });
     },
 
-    showEditor: function(options) {
-        options = options || {};
-        var note = options.note;
-        var isInbox = note && note.status === 'inbox';
-        var isNew = !note;
+    renderEditor: function(noteId, projectId, initialTitle) {
+        var container = document.getElementById('view-note');
+        if (!container) return;
 
         Promise.all([
-            note ? RetraqDB.getNoteTags(note.id) : Promise.resolve([]),
-            note ? RetraqDB.getProjectsForNote(note.id) : Promise.resolve([]),
+            noteId && noteId !== 'new' ? RetraqDB.getNote(noteId) : Promise.resolve(null),
+            noteId && noteId !== 'new' ? RetraqDB.getNoteTags(noteId) : Promise.resolve([]),
+            noteId && noteId !== 'new' ? RetraqDB.getProjectsForNote(noteId) : Promise.resolve([]),
             RetraqDB.getAllProjects(),
             RetraqDB.getAllAreas(),
             RetraqDB.getAllNotes()
         ]).then(function(results) {
-            var tags = results[0];
-            var linkedProjects = results[1];
-            var allProjects = results[2];
-            var allAreas = results[3];
-            var allNotes = results[4];
-            var linkedId = linkedProjects.length ? linkedProjects[0].id : (options.projectId || '');
+            var note = results[0];
+            var tags = results[1];
+            var linkedProjects = results[2];
+            var allProjects = results[3];
+            var allAreas = results[4];
+            var allNotes = results[5];
+            
+            var isInbox = note && note.status === 'inbox';
+            var isNew = !note;
+
+            var linkedId = linkedProjects.length ? linkedProjects[0].id : (projectId || '');
             var noteAreaId = note ? (note.area_id || '') : '';
 
             // Calculate Backlinks
@@ -86,130 +90,256 @@ const Notes = {
 
             var backlinksHtml = '';
             if (backlinks.length > 0) {
-                backlinksHtml = '<div class="backlinks-section">' +
-                    '<label>Backlinks (' + backlinks.length + ')</label>' +
+                backlinksHtml = '<div class="backlinks-section" style="margin-top:1.5rem">' +
+                    '<h3 style="font-size:0.9rem;margin-bottom:0.5rem;color:var(--color-text-secondary)">🔗 Backlinks (' + backlinks.length + ')</h3>' +
                     '<div class="backlinks-list">' +
                         backlinks.map(function(b) {
-                            return '<div class="backlink-item" data-action="open-backlink" data-id="' + b.id + '">' +
-                                '<span class="nav-icon">🔗</span> ' + Utils.escapeHtml(b.title || 'Untitled') +
-                            '</div>';
+                            return '<a href="#/note/' + b.id + '" class="backlink-item" style="display:block;padding:0.5rem;background:var(--color-bg-secondary);border-radius:6px;margin-bottom:0.25rem;text-decoration:none;color:var(--color-text)">' +
+                                '📄 ' + Utils.escapeHtml(b.title || 'Untitled') +
+                            '</a>';
                         }).join('') +
                     '</div>' +
                 '</div>';
             }
 
-            Components.modal({
-                title: isInbox ? 'Process Inbox' : (isNew ? 'New Note' : 'Edit Note'),
-                body:
-                    '<form id="note-form">' +
-                        '<div class="form-group">' +
-                            '<label for="note-title">Title</label>' +
-                            '<input id="note-title" name="title" value="' + Utils.escapeHtml(note ? note.title : '') + '" placeholder="Optional — auto from first line">' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label for="note-content">Content <span class="muted" style="font-weight:400;font-size:0.75rem">Use [[Note Title]] to link notes</span></label>' +
-                            '<textarea id="note-content" name="content" rows="8" placeholder="Write your note… Use [[Note Title]] for bi-links">' +
-                                Utils.escapeHtml(note ? note.content : (options.content || '')) +
-                            '</textarea>' +
-                        '</div>' +
-                        '<div class="grid-2">' +
-                            '<div class="form-group">' +
-                                '<label for="note-type">Type</label>' +
-                                '<select id="note-type" name="type">' + typeOptions + '</select>' +
+            var initialContent = note ? note.content : '';
+            if (isNew && !initialContent && typeof localStorage !== 'undefined') {
+                initialContent = localStorage.getItem('retraq_tpl_note') || '';
+            }
+
+            var linkTargets = BiLinks.extractLinks(initialContent);
+
+            BiLinks.resolveLinks(linkTargets).then(function(resolvedMap) {
+                var initialPreview = Markdown.render(
+                    initialContent,
+                    resolvedMap
+                );
+
+                container.innerHTML =
+                    '<div class="card" style="max-width:900px;margin:0 auto;padding:1.5rem">' +
+                        '<div class="section-header" style="margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--color-divider)">' +
+                            '<div>' +
+                                '<h2 class="section-title">' + (isInbox ? 'Process Inbox' : (isNew ? 'New Note' : 'Edit Note')) + '</h2>' +
                             '</div>' +
-                            '<div class="form-group">' +
-                                '<label for="note-project">Link to project</label>' +
-                                '<select id="note-project" name="project_id">' + projectOptions + '</select>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="grid-2">' +
-                            '<div class="form-group">' +
-                                '<label for="note-area">Area</label>' +
-                                '<select id="note-area" name="area_id">' + areaOptions + '</select>' +
-                            '</div>' +
-                            '<div class="form-group">' +
-                                '<label for="note-tags">Tags (comma separated)</label>' +
-                                '<input id="note-tags" name="tags" value="' + Utils.escapeHtml(tags.map(function(t) { return t.name; }).join(', ')) + '" placeholder="e.g. javascript, pkm">' +
+                            '<div style="display:flex;gap:0.5rem">' +
+                                (note && !isInbox ? '<button type="button" class="btn btn-sm btn-danger" id="btn-delete-note">Delete</button>' : '') +
+                                '<button type="button" class="btn btn-sm" id="btn-cancel-note">Cancel</button>' +
+                                '<button type="button" class="btn btn-sm btn-primary" id="btn-save-note">' + (isInbox ? 'Process &amp; Save' : 'Save') + '</button>' +
                             '</div>' +
                         '</div>' +
-                        backlinksHtml +
-                    '</form>',
-                footer:
-                    (note && !isInbox ? '<button type="button" class="btn btn-danger" id="btn-delete-note">Delete</button>' : '') +
-                    '<button type="button" class="btn" data-modal-close>Cancel</button>' +
-                    '<button type="button" class="btn btn-primary" id="btn-save-note">' +
-                        (isInbox ? 'Process &amp; Save' : 'Save') +
-                    '</button>',
-                onMount: function(modal, close) {
-                    modal.querySelector('#btn-save-note').addEventListener('click', function() {
-                        var form = modal.querySelector('#note-form');
-                        var content = form.content.value.trim();
-                        if (!content) {
-                            Components.toast('Content cannot be empty', 'error');
-                            return;
-                        }
+                        '<form id="note-form">' +
+                            '<div class="form-group">' +
+                                '<input id="note-title" name="title" value="' + Utils.escapeHtml(note ? note.title : (initialTitle || '')) + '" placeholder="Note Title (Optional)" style="font-size:1.5rem;font-weight:600;padding:0.75rem;border:none;border-bottom:2px solid var(--color-border);background:transparent;width:100%;color:var(--color-text)">' +
+                            '</div>' +
+                            '<div class="daily-split" style="margin-top:1.5rem">' +
+                                '<div class="md-editor-wrap">' +
+                                    '<div class="md-editor-toolbar">' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="bold" title="Bold"><b>B</b></button>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="italic" title="Italic"><i>I</i></button>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="strike" title="Strikethrough"><s>S</s></button>' +
+                                        '<span class="md-toolbar-sep"></span>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="h2" title="Heading">H</button>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="code" title="Code">&lt;/&gt;</button>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="link" title="Wiki link">🔗</button>' +
+                                        '<span class="md-toolbar-sep"></span>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="check" title="Checkbox">☑</button>' +
+                                        '<button type="button" class="md-toolbar-btn" data-md="quote" title="Quote">❝</button>' +
+                                    '</div>' +
+                                    '<textarea id="note-content" name="content" class="md-editor-textarea" style="min-height:400px" placeholder="Write with Markdown… Use [[Note Title]] for bi-links">' +
+                                        Utils.escapeHtml(initialContent) +
+                                    '</textarea>' +
+                                '</div>' +
+                                '<div class="md-preview-card">' +
+                                    '<div class="md-preview-label">Live Preview</div>' +
+                                    '<div class="md-preview-area md-rendered" id="note-modal-preview">' +
+                                        initialPreview +
+                                    '</div>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="grid-2" style="margin-top:1.5rem">' +
+                                '<div class="form-group">' +
+                                    '<label for="note-type">Type</label>' +
+                                    '<select id="note-type" name="type" class="sort-select" style="width:100%">' + typeOptions + '</select>' +
+                                '</div>' +
+                                '<div class="form-group">' +
+                                    '<label for="note-project">Link to project</label>' +
+                                    '<select id="note-project" name="project_id" class="sort-select" style="width:100%">' + projectOptions + '</select>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="grid-2">' +
+                                '<div class="form-group">' +
+                                    '<label for="note-area">Area</label>' +
+                                    '<select id="note-area" name="area_id" class="sort-select" style="width:100%">' + areaOptions + '</select>' +
+                                '</div>' +
+                                '<div class="form-group">' +
+                                    '<label for="note-tags">Tags (comma separated)</label>' +
+                                    '<input id="note-tags" name="tags" class="form-control" value="' + Utils.escapeHtml(tags.map(function(t) { return t.name; }).join(', ')) + '" placeholder="e.g. javascript, pkm">' +
+                                '</div>' +
+                            '</div>' +
+                            backlinksHtml +
+                        '</form>' +
+                    '</div>';
 
-                        var payload = {
-                            title: form.title.value.trim(),
-                            content: content,
-                            type: form.type.value,
-                            tags: Utils.parseTags(form.tags.value),
-                            project_id: form.project_id.value || null,
-                            area_id: form.area_id.value || null
-                        };
+                var contentTextarea = container.querySelector('#note-content');
+                var previewEl = container.querySelector('#note-modal-preview');
 
-                        var savePromise;
-                        if (isInbox && note) {
-                            savePromise = RetraqDB.processInboxNote(note.id, payload);
-                        } else if (note) {
-                            savePromise = RetraqDB.updateNote(note.id, payload).then(function(saved) {
-                                return RetraqDB.setNoteTags(saved.id, payload.tags).then(function() {
-                                    if (payload.project_id) {
-                                        return RetraqDB.linkNoteToProject(saved.id, payload.project_id).then(function() { return saved; });
-                                    }
-                                    return saved;
-                                });
-                            });
-                        } else {
-                            savePromise = RetraqDB.createNote(Object.assign({}, payload, { status: 'active' }));
-                        }
+                LinkAutocomplete.attach(contentTextarea);
 
-                        savePromise.then(function() {
-                            Components.toast(isInbox ? 'Processed to note' : 'Note saved');
-                            close();
-                            if (options.onSave) options.onSave();
-                            App.updateInboxBadge();
-                        }).catch(function(err) {
-                            Components.toast(err.message || 'Save failed', 'error');
-                        });
-                    });
-
-                    var deleteBtn = modal.querySelector('#btn-delete-note');
-                    if (deleteBtn) {
-                        deleteBtn.addEventListener('click', function() {
-                            if (!confirm('Delete this note?')) return;
-                            RetraqDB.deleteNote(note.id).then(function() {
-                                Components.toast('Note deleted');
-                                close();
-                                if (options.onSave) options.onSave();
-                            });
-                        });
-                    }
-
-                    // Open backlink
-                    modal.querySelectorAll('[data-action="open-backlink"]').forEach(function(el) {
-                        el.addEventListener('click', function() {
-                            RetraqDB.getNote(el.dataset.id).then(function(targetNote) {
-                                if (targetNote) {
-                                    close();
-                                    Notes.showEditor({ note: targetNote, onSave: options.onSave });
+                var previewTimer = null;
+                contentTextarea.addEventListener('input', function() {
+                    clearTimeout(previewTimer);
+                    previewTimer = setTimeout(function() {
+                        var targets = BiLinks.extractLinks(contentTextarea.value);
+                        BiLinks.resolveLinks(targets).then(function(newMap) {
+                            previewEl.innerHTML = Markdown.render(contentTextarea.value, newMap);
+                            BiLinks.bindLinks(previewEl, function(nId) {
+                                if (nId) {
+                                    window.location.hash = '#/note/' + nId;
                                 }
                             });
                         });
+                    }, 300);
+                });
+
+                container.querySelectorAll('[data-md]').forEach(function(btn) {
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        Notes._insertMarkdown(contentTextarea, btn.dataset.md);
+                    });
+                });
+
+                container.querySelector('#btn-cancel-note').addEventListener('click', function() {
+                    window.history.back();
+                });
+
+                container.querySelector('#btn-save-note').addEventListener('click', function() {
+                    var form = container.querySelector('#note-form');
+                    var content = form.content.value.trim();
+                    if (!content) {
+                        Components.toast('Content cannot be empty', 'error');
+                        return;
+                    }
+
+                    var payload = {
+                        title: form.title.value.trim(),
+                        content: content,
+                        type: form.type.value,
+                        tags: Utils.parseTags(form.tags.value),
+                        project_id: form.project_id.value || null,
+                        area_id: form.area_id.value || null
+                    };
+
+                    var savePromise;
+                    if (isInbox && note) {
+                        savePromise = RetraqDB.processInboxNote(note.id, payload);
+                    } else if (note) {
+                        savePromise = RetraqDB.updateNote(note.id, payload).then(function(saved) {
+                            return RetraqDB.setNoteTags(saved.id, payload.tags).then(function() {
+                                if (payload.project_id) {
+                                    return RetraqDB.linkNoteToProject(saved.id, payload.project_id).then(function() { return saved; });
+                                }
+                                return saved;
+                            });
+                        });
+                    } else {
+                        savePromise = RetraqDB.createNote(Object.assign({}, payload, { status: 'active' }));
+                    }
+
+                    savePromise.then(function() {
+                        Components.toast(isInbox ? 'Processed to note' : 'Note saved');
+                        LinkAutocomplete.detach();
+                        LinkAutocomplete.refresh();
+                        window.history.back();
+                        App.updateInboxBadge();
+                    }).catch(function(err) {
+                        Components.toast(err.message || 'Save failed', 'error');
+                    });
+                });
+
+                var deleteBtn = container.querySelector('#btn-delete-note');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', function() {
+                        if (!confirm('Delete this note?')) return;
+                        RetraqDB.deleteNote(note.id).then(function() {
+                            Components.toast('Note deleted');
+                            LinkAutocomplete.detach();
+                            window.history.back();
+                        });
                     });
                 }
+                
+                // Also bind initial preview bilinks
+                BiLinks.bindLinks(previewEl, function(nId) {
+                    if (nId) window.location.hash = '#/note/' + nId;
+                });
             });
         });
+    },
+
+    /**
+     * Insert markdown syntax at cursor position
+     */
+    _insertMarkdown: function(textarea, type) {
+        var start = textarea.selectionStart;
+        var end = textarea.selectionEnd;
+        var text = textarea.value;
+        var selected = text.slice(start, end);
+        var before = text.slice(0, start);
+        var after = text.slice(end);
+        var insertion = '';
+        var cursorOffset = 0;
+
+        switch (type) {
+            case 'bold':
+                insertion = '**' + (selected || 'bold') + '**';
+                cursorOffset = selected ? insertion.length : 2;
+                break;
+            case 'italic':
+                insertion = '*' + (selected || 'italic') + '*';
+                cursorOffset = selected ? insertion.length : 1;
+                break;
+            case 'strike':
+                insertion = '~~' + (selected || 'text') + '~~';
+                cursorOffset = selected ? insertion.length : 2;
+                break;
+            case 'h2':
+                insertion = '## ' + (selected || 'Heading');
+                cursorOffset = insertion.length;
+                break;
+            case 'code':
+                insertion = '`' + (selected || 'code') + '`';
+                cursorOffset = selected ? insertion.length : 1;
+                break;
+            case 'link':
+                insertion = '[[' + (selected || '') + ']]';
+                cursorOffset = selected ? insertion.length : 2;
+                break;
+            case 'check':
+                insertion = '- [ ] ' + (selected || 'task');
+                cursorOffset = insertion.length;
+                break;
+            case 'quote':
+                insertion = '> ' + (selected || 'quote');
+                cursorOffset = insertion.length;
+                break;
+        }
+
+        textarea.focus();
+        
+        // Use execCommand to preserve the native Undo/Redo stack (Phase 5.3)
+        var success = false;
+        try {
+            success = document.execCommand('insertText', false, insertion);
+        } catch (e) {}
+
+        if (!success) {
+            // Fallback if execCommand is not supported
+            textarea.value = before + insertion + after;
+        }
+        
+        textarea.selectionStart = start + cursorOffset;
+        textarea.selectionEnd = start + cursorOffset;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
 };
 

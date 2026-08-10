@@ -31,6 +31,7 @@ const Areas = {
     renderList: function(areas) {
         if (!areas || !areas.length) {
             return '<div class="empty-state card">' +
+                Utils.getEmptyStateSvg() +
                 '<p>No areas yet.</p>' +
                 '<p class="muted" style="margin-top:0.5rem">Areas are ongoing parts of life: Health, Career, Finance, Learning, etc.</p>' +
             '</div>';
@@ -167,12 +168,7 @@ const Areas = {
                 });
 
                 Notes.bindNoteCards(container, function(noteId) {
-                    RetraqDB.getNote(noteId).then(function(note) {
-                        Notes.showEditor({
-                            note: note,
-                            onSave: function() { Areas.renderDetail(areaId); }
-                        });
-                    });
+                    window.location.hash = '#/note/' + noteId;
                 });
             });
         });

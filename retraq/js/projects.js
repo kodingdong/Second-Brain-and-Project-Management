@@ -1,19 +1,26 @@
 /**
  * Projects — Notion-style multi-view (Gallery / Kanban / Table)
+ * with Filter & Sort capabilities
  */
 const Projects = {
     currentView: 'gallery',
     VIEWS: ['gallery', 'kanban', 'table'],
+    currentFilter: 'all',
+    currentSort: 'activity',
 
     render: function() {
         var container = document.getElementById('view-projects');
         if (!container) return;
 
-        // Restore saved view preference
+        // Restore saved preferences
         var saved = localStorage.getItem('retraq_projects_view');
         if (saved && Projects.VIEWS.indexOf(saved) !== -1) {
             Projects.currentView = saved;
         }
+        var savedFilter = localStorage.getItem('retraq_projects_filter');
+        if (savedFilter) Projects.currentFilter = savedFilter;
+        var savedSort = localStorage.getItem('retraq_projects_sort');
+        if (savedSort) Projects.currentSort = savedSort;
 
         Promise.all([
             RetraqDB.getAllProjects(),
@@ -26,23 +33,112 @@ const Projects = {
                 });
             }));
         }).then(function(items) {
+            // Apply filter
+            var filtered = Projects._applyFilter(items);
+            // Apply sort
+            var sorted = Projects._applySort(filtered);
+
             container.innerHTML =
                 '<div class="projects-header">' +
                     '<div>' +
                         '<h2 class="section-title">Projects</h2>' +
-                        '<p class="muted">' + items.length + ' project' + (items.length !== 1 ? 's' : '') + '</p>' +
+                        '<p class="muted">' + sorted.length + ' of ' + items.length + ' project' + (items.length !== 1 ? 's' : '') + '</p>' +
                     '</div>' +
                     '<div class="projects-toolbar">' +
                         Projects.renderViewSwitcher() +
                         '<button type="button" class="btn btn-primary btn-sm" data-action="new-project">+ New</button>' +
                     '</div>' +
                 '</div>' +
+                '<div class="projects-filter-bar">' +
+                    Projects._renderFilterBar(items) +
+                '</div>' +
                 '<div id="projects-view-container">' +
-                    Projects.renderCurrentView(items) +
+                    Projects.renderCurrentView(sorted) +
                 '</div>';
 
             Projects.bindActions(container);
         });
+    },
+
+    _renderFilterBar: function(allItems) {
+        var statusCounts = {};
+        allItems.forEach(function(item) {
+            var s = item.project.status;
+            statusCounts[s] = (statusCounts[s] || 0) + 1;
+        });
+
+        var filters = [
+            { id: 'all', label: 'All', count: allItems.length }
+        ];
+        Utils.PROJECT_STATUSES.forEach(function(s) {
+            if (statusCounts[s]) {
+                filters.push({ id: s, label: Utils.statusLabel(s), count: statusCounts[s] });
+            }
+        });
+
+        var sortOptions = [
+            { id: 'activity', label: 'Last Active' },
+            { id: 'name', label: 'Name A-Z' },
+            { id: 'name-desc', label: 'Name Z-A' },
+            { id: 'progress', label: 'Progress ↑' },
+            { id: 'progress-desc', label: 'Progress ↓' },
+            { id: 'date', label: 'Target Date' }
+        ];
+
+        return '<div class="filter-chips">' +
+            filters.map(function(f) {
+                return '<button type="button" class="filter-chip' +
+                    (Projects.currentFilter === f.id ? ' active' : '') +
+                    '" data-filter="' + f.id + '">' +
+                    f.label + ' <span class="filter-count">' + f.count + '</span>' +
+                '</button>';
+            }).join('') +
+        '</div>' +
+        '<div class="sort-control">' +
+            '<label class="sort-label">Sort:</label>' +
+            '<select class="sort-select" id="projects-sort">' +
+                sortOptions.map(function(o) {
+                    return '<option value="' + o.id + '"' +
+                        (Projects.currentSort === o.id ? ' selected' : '') + '>' +
+                        o.label + '</option>';
+                }).join('') +
+            '</select>' +
+        '</div>';
+    },
+
+    _applyFilter: function(items) {
+        if (Projects.currentFilter === 'all') return items;
+        return items.filter(function(item) {
+            return item.project.status === Projects.currentFilter;
+        });
+    },
+
+    _applySort: function(items) {
+        var sorted = items.slice();
+        switch (Projects.currentSort) {
+            case 'name':
+                sorted.sort(function(a, b) { return a.project.title.localeCompare(b.project.title); });
+                break;
+            case 'name-desc':
+                sorted.sort(function(a, b) { return b.project.title.localeCompare(a.project.title); });
+                break;
+            case 'progress':
+                sorted.sort(function(a, b) { return a.progress.percent - b.progress.percent; });
+                break;
+            case 'progress-desc':
+                sorted.sort(function(a, b) { return b.progress.percent - a.progress.percent; });
+                break;
+            case 'date':
+                sorted.sort(function(a, b) {
+                    var da = a.project.target_date || '9999';
+                    var db = b.project.target_date || '9999';
+                    return da.localeCompare(db);
+                });
+                break;
+            default: // activity — already sorted by db
+                break;
+        }
+        return sorted;
     },
 
     renderViewSwitcher: function() {
@@ -69,8 +165,8 @@ const Projects = {
     renderGallery: function(items) {
         if (!items.length) {
             return '<div class="empty-state card">' +
-                '<p style="font-size:1.5rem;margin-bottom:0.5rem">\ud83d\udcc1</p>' +
-                '<p>No projects yet. Create your first one!</p>' +
+                Utils.getEmptyStateSvg('projects') +
+                '<p>No projects match this filter.</p>' +
                 '<button type="button" class="btn btn-primary" data-action="new-project" style="margin-top:0.75rem">+ New Project</button>' +
             '</div>';
         }
@@ -158,7 +254,8 @@ const Projects = {
     renderTable: function(items) {
         if (!items.length) {
             return '<div class="empty-state card">' +
-                '<p>No projects yet.</p>' +
+                Utils.getEmptyStateSvg('projects') +
+                '<p>No projects match this filter.</p>' +
                 '<button type="button" class="btn btn-primary" data-action="new-project" style="margin-top:0.75rem">+ New Project</button>' +
             '</div>';
         }
@@ -215,6 +312,25 @@ const Projects = {
             });
         });
 
+        // Filter chips
+        container.querySelectorAll('[data-filter]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                Projects.currentFilter = btn.dataset.filter;
+                localStorage.setItem('retraq_projects_filter', Projects.currentFilter);
+                Projects.render();
+            });
+        });
+
+        // Sort select
+        var sortSelect = container.querySelector('#projects-sort');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', function() {
+                Projects.currentSort = sortSelect.value;
+                localStorage.setItem('retraq_projects_sort', Projects.currentSort);
+                Projects.render();
+            });
+        }
+
         // New project
         container.querySelectorAll('[data-action="new-project"]').forEach(function(btn) {
             btn.addEventListener('click', function() {
@@ -257,7 +373,7 @@ const Projects = {
 
         container.querySelectorAll('.kanban-column').forEach(function(col) {
             col.addEventListener('dragover', function(e) {
-                e.preventDefault(); // Necessary to allow drop
+                e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 if (draggedCard && !col.contains(draggedCard)) {
                     col.classList.add('drag-over');
