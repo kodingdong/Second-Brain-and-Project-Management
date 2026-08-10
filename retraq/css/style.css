@@ -2478,6 +2478,32 @@ kbd {
 .md-rendered em { font-style: italic; }
 .md-rendered del { color: var(--color-text-muted); }
 
+.md-rendered .md-task-progress {
+    margin: 1rem 0 0.5rem 0;
+    font-family: var(--font-sans);
+}
+
+.md-rendered .md-progress-bar {
+    height: 6px;
+    background: var(--color-border);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.md-rendered .md-progress-fill {
+    height: 100%;
+    background: var(--color-accent-emerald);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+.md-rendered .md-progress-text {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-align: right;
+}
+
 /* Bilinks inside rendered content */
 .md-rendered .bilink-resolved {
     color: var(--color-primary);

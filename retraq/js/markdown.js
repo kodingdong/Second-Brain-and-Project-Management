@@ -159,23 +159,40 @@ const Markdown = {
      */
     _flushList: function(type, items, resolvedLinks) {
         var tag = type === 'ol' ? 'ol' : 'ul';
-        return '<' + tag + ' class="md-list md-' + tag + '">' +
-            items.map(function(item) {
-                // Checkbox support: - [ ] or - [x]
-                var checkMatch = item.match(/^\[( |x|X)\]\s*(.*)/);
-                if (checkMatch) {
-                    var checked = checkMatch[1].toLowerCase() === 'x';
-                    return '<li class="md-checkbox-item">' +
-                        '<span class="md-checkbox ' + (checked ? 'md-checked' : '') + '">' +
-                            (checked ? '✓' : '') +
-                        '</span>' +
-                        '<span' + (checked ? ' class="md-checked-text"' : '') + '>' +
-                            Markdown._inline(checkMatch[2], resolvedLinks) +
-                        '</span></li>';
-                }
-                return '<li>' + Markdown._inline(item, resolvedLinks) + '</li>';
-            }).join('') +
-        '</' + tag + '>';
+        var totalCheckboxes = 0;
+        var checkedCheckboxes = 0;
+        var hasCheckboxes = false;
+
+        var htmlItems = items.map(function(item) {
+            // Checkbox support: - [ ] or - [x]
+            var checkMatch = item.match(/^\[( |x|X)\]\s*(.*)/);
+            if (checkMatch) {
+                hasCheckboxes = true;
+                totalCheckboxes++;
+                var checked = checkMatch[1].toLowerCase() === 'x';
+                if (checked) checkedCheckboxes++;
+
+                return '<li class="md-checkbox-item">' +
+                    '<span class="md-checkbox ' + (checked ? 'md-checked' : '') + '">' +
+                        (checked ? '✓' : '') +
+                    '</span>' +
+                    '<span' + (checked ? ' class="md-checked-text"' : '') + '>' +
+                        Markdown._inline(checkMatch[2], resolvedLinks) +
+                    '</span></li>';
+            }
+            return '<li>' + Markdown._inline(item, resolvedLinks) + '</li>';
+        }).join('');
+
+        var prefix = '';
+        if (hasCheckboxes && totalCheckboxes > 0) {
+            var percent = Math.round((checkedCheckboxes / totalCheckboxes) * 100);
+            prefix = '<div class="md-task-progress">' +
+                     '<div class="md-progress-bar"><div class="md-progress-fill" style="width:' + percent + '%"></div></div>' +
+                     '<div class="md-progress-text">' + percent + '% completed (' + checkedCheckboxes + '/' + totalCheckboxes + ')</div>' +
+                     '</div>';
+        }
+
+        return prefix + '<' + tag + ' class="md-list md-' + tag + '">' + htmlItems + '</' + tag + '>';
     },
 
     /**
